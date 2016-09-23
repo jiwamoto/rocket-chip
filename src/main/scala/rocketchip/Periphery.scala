@@ -71,6 +71,13 @@ object PeripheryUtils {
     bridge.io.tl <> tl
     bridge.io.ahb
   }
+  def convertAXItoTL(axi: NastiIO)(implicit p: Parameters) = {
+    val frag = Module(new NastiFragmenter)
+    val bridge = Module(new TileLinkIONastiIOConverter)
+    frag.io.in <> axi
+    bridge.io.nasti <> addQueueAXI(frag.io.out)
+    bridge.io.tl
+  }
 }
 
 /** Utility trait for quick access to some relevant parameters */
@@ -274,12 +281,10 @@ trait PeripherySlaveModule extends HasPeripheryParameters {
         else AsyncNastiFrom(io.bus_clk.get(idx), io.bus_rst.get(idx), bus)
       )
     }
-    val conv = Module(new TileLinkIONastiIOConverter()(innerParams))
-    conv.io.nasti <> arb.io.slave
 
     val r = outer.pBusMasters.range("ext")
     require(r._2 - r._1 == 1, "RangeManager should return 1 slot")
-    coreplexIO.slave(r._1) <> conv.io.tl
+    coreplexIO.slave(r._1) <> PeripheryUtils.convertAXItoTL(arb.io.slave)(innerParams)
   }
 }
 
